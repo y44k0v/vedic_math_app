@@ -328,23 +328,38 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               child: Row(
                 children: [
                   Expanded(
+                    flex: 2,
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
                       onPressed: _showSolutionSheet,
-                      icon: const Icon(Icons.lightbulb_outline),
-                      label: const Text('Solution'),
+                      icon: const Icon(Icons.lightbulb_outline, size: 18),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Solution', maxLines: 1, softWrap: false),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    flex: 2,
+                    flex: 3,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
                       onPressed: _hasSubmitted ? _nextQuestion : _submitAnswer,
-                      child: Text(
-                        _hasSubmitted
-                            ? (_currentIndex == totalQuestions - 1
-                                  ? 'Finish Drill'
-                                  : 'Next Question')
-                            : 'Check Answer',
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _hasSubmitted
+                              ? (_currentIndex == totalQuestions - 1
+                                    ? 'Finish Drill'
+                                    : 'Next Question')
+                              : 'Check Answer',
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
                       ),
                     ),
                   ),
