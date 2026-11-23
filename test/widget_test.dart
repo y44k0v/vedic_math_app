@@ -1,30 +1,34 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-
-import 'package:vedic_math_app/main.dart';
+import 'package:vedic_math_app/data/vedic_catalog.dart';
+import 'package:vedic_math_app/engine/exercise_generator.dart';
+import 'package:vedic_math_app/screens/theory_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('All 29 Sutras and Sub-Sutras generate 25 valid exercises', () {
+    final generator = ExerciseGenerator();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(vedicCatalog.length, 29);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    for (final item in vedicCatalog) {
+      for (int i = 0; i < 25; i++) {
+        final problem = generator.generate(item.id, i);
+        expect(problem.prompt, isNotEmpty);
+        expect(problem.primaryAnswer, isNotEmpty);
+        expect(problem.solutionSteps, isNotEmpty);
+      }
+    }
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('TheoryScreen renders Sutra details and drill button', (
+    WidgetTester tester,
+  ) async {
+    final firstSutra = vedicCatalog.first;
+
+    await tester.pumpWidget(MaterialApp(home: TheoryScreen(item: firstSutra)));
+
+    expect(find.text('Sutra 1'), findsOneWidget);
+    expect(find.text(firstSutra.sanskritName), findsOneWidget);
+    expect(find.text('Start 25 Exercises'), findsOneWidget);
   });
 }

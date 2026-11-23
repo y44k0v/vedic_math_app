@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../data/vedic_catalog.dart';
 import '../database/db_helper.dart';
