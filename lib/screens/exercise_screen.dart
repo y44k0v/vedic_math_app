@@ -93,6 +93,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   void _showSolutionSheet() {
+    FocusScope.of(context).unfocus(); // Dismiss keyboard before opening sheet
     if (!_hasSubmitted) {
       setState(() => _solutionViewedBeforeSubmit = true);
     }
@@ -100,59 +101,69 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.lightbulb_rounded,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
+      builder: (context) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            8,
+            24,
+            24 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Vedic Solution',
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              if (_solutionViewedBeforeSubmit && !_hasSubmitted) ...[
+                const SizedBox(height: 6),
                 Text(
-                  'Vedic Solution',
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  'Note: Viewing the solution before answering forfeits the 10 pts for this question.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ],
-            ),
-            if (_solutionViewedBeforeSubmit && !_hasSubmitted) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 16),
               Text(
-                'Note: Viewing the solution before answering forfeits the 10 pts for this question.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.error,
+                problem.solutionSteps,
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  problem.secondaryAnswer != null
+                      ? 'Answer: ${problem.primaryAnswer}, ${problem.secondaryAnswer}'
+                      : 'Answer: ${problem.primaryAnswer}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            Text(
-              problem.solutionSteps,
-              style: Theme.of(context).textTheme.bodyLarge
-                  ?.copyWith(height: 1.5),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                problem.secondaryAnswer != null
-                    ? 'Answer: ${problem.primaryAnswer}, ${problem.secondaryAnswer}'
-                    : 'Answer: ${problem.primaryAnswer}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -242,92 +253,103 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        top: false, // AppBar already handles the top status bar
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            LinearProgressIndicator(
-              value: (_currentIndex + 1) / totalQuestions,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 0,
-              color: colors.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      problem.prompt,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                    LinearProgressIndicator(
+                      value: (_currentIndex + 1) / totalQuestions,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Hint: ${problem.hint}',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(color: colors.onSurfaceVariant),
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 0,
+                      color: colors.surfaceContainerHighest,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Text(
+                              problem.prompt,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Hint: ${problem.hint}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: colors.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
+                    const SizedBox(height: 24),
+                    _buildInputArea(problem),
+                    const SizedBox(height: 16),
+                    if (_hasSubmitted)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _isCorrect
+                              ? Colors.green.withValues(alpha: 0.15)
+                              : colors.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _isCorrect
+                              ? (_solutionViewedBeforeSubmit
+                                    ? 'Correct! (0 pts because Solution was viewed)'
+                                    : 'Correct! +10 points!')
+                              : 'Incorrect. Correct Answer: ${problem.primaryAnswer}${problem.secondaryAnswer != null ? ", ${problem.secondaryAnswer}" : ""}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _isCorrect
+                                ? Colors.green.shade800
+                                : colors.onErrorContainer,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            _buildInputArea(problem),
-            const SizedBox(height: 16),
-            if (_hasSubmitted)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _isCorrect
-                      ? Colors.green.withValues(alpha: 0.15)
-                      : colors.errorContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _isCorrect
-                      ? (_solutionViewedBeforeSubmit
-                            ? 'Correct! (0 pts because Solution was viewed)'
-                            : 'Correct! +10 points!')
-                      : 'Incorrect. Correct Answer: ${problem.primaryAnswer}${problem.secondaryAnswer != null ? ", ${problem.secondaryAnswer}" : ""}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _isCorrect
-                        ? Colors.green.shade800
-                        : colors.onErrorContainer,
-                  ),
-                ),
-              ),
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _showSolutionSheet,
-                    icon: const Icon(Icons.lightbulb_outline),
-                    label: const Text('Solution'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton(
-                    onPressed: _hasSubmitted ? _nextQuestion : _submitAnswer,
-                    child: Text(
-                      _hasSubmitted
-                          ? (_currentIndex == totalQuestions - 1
-                                ? 'Finish Drill'
-                                : 'Next Question')
-                          : 'Check Answer',
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showSolutionSheet,
+                      icon: const Icon(Icons.lightbulb_outline),
+                      label: const Text('Solution'),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: _hasSubmitted ? _nextQuestion : _submitAnswer,
+                      child: Text(
+                        _hasSubmitted
+                            ? (_currentIndex == totalQuestions - 1
+                                  ? 'Finish Drill'
+                                  : 'Next Question')
+                            : 'Check Answer',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

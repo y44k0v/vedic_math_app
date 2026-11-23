@@ -20,7 +20,12 @@ class TheoryScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          96 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           Card(
             color: colors.primaryContainer,
