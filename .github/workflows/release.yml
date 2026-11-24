@@ -42,16 +42,31 @@ jobs:
         run: |
           flutter analyze
           flutter test
-
+      
       - name: Decode Android Keystore & Create key.properties
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/upload-keystore.jks
-          cat <<EOF > android/key.properties
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=${{ github.workspace }}/android/upload-keystore.jks
-          EOF
+              python3 - << 'PYEOF'
+              import base64, os
+
+              b64 = "".join(os.environ["KEYSTORE_BASE64"].split())
+              with open("android/upload-keystore.jks", "wb") as f:
+                  f.write(base64.b64decode(b64))
+
+              def esc(v: str) -> str:
+                  return v.replace("\\", "\\\\")
+
+              with open("android/key.properties", "w") as f:
+                  f.write(f"storePassword={esc(os.environ['STORE_PASSWORD'])}\n")
+                  f.write(f"keyPassword={esc(os.environ['KEY_PASSWORD'])}\n")
+                  f.write(f"keyAlias={esc(os.environ['KEY_ALIAS'])}\n")
+                  f.write(f"storeFile={os.environ['GITHUB_WORKSPACE']}/android/upload-keystore.jks\n")
+              PYEOF
+              keytool -list -keystore android/upload-keystore.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
 
       - name: Determine Version Name
         id: meta
