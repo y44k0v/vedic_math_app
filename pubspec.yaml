@@ -52,6 +52,18 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
+
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#D97706" # Solid hex color OR path to a 1024x1024 PNG
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_foreground_inset: 16  # Adds 16% padding around foreground (default: 16)
+  # Optional: uncomment if you created a monochrome icon for Android 13+ themed icons
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
