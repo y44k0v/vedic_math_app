@@ -1,25 +1,8 @@
-# vedic_math_app
+# Vedic Math Mastery
 
-A new Flutter project.
+A Flutter project. Includes background guide in this repo and short background in the app. Created to assist to permform faster mental calculations.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
-
-![Alt text](assets/icon/app_icon.png)
-
-![Alt text](assets/icon/icon_foreground.png)
+Only android icons included. Use dart to generate other platform icons via flutter launcher icons package,
 
 ![Alt text](assets/icon/icon_monochrome.png)
 
