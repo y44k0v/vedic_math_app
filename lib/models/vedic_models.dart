@@ -61,6 +61,7 @@ class MathProblem {
 
 class SessionRecord {
   final int? id;
+  final int playerId;
   final String itemId;
   final String itemTitle;
   final int score;
@@ -71,6 +72,7 @@ class SessionRecord {
 
   const SessionRecord({
     this.id,
+    required this.playerId,
     required this.itemId,
     required this.itemTitle,
     required this.score,
@@ -82,6 +84,7 @@ class SessionRecord {
 
   Map<String, dynamic> toMap() => {
     'id': id,
+    'player_id': playerId,
     'item_id': itemId,
     'item_title': itemTitle,
     'score': score,
@@ -93,6 +96,7 @@ class SessionRecord {
 
   factory SessionRecord.fromMap(Map<String, dynamic> map) => SessionRecord(
     id: map['id'] as int?,
+    playerId: map['player_id'] as int,
     itemId: map['item_id'] as String,
     itemTitle: map['item_title'] as String,
     score: map['score'] as int,
