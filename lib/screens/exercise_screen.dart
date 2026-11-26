@@ -8,8 +8,9 @@ import '../models/vedic_models.dart';
 
 class ExerciseScreen extends StatefulWidget {
   final VedicItem item;
+  final Player player;
 
-  const ExerciseScreen({super.key, required this.item});
+  const ExerciseScreen({super.key, required this.item, required this.player});
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
