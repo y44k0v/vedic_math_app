@@ -116,13 +116,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 40,
+                            reservedSize: 48,
                             interval: 50,
                             getTitlesWidget: (value, meta) {
                               if (value > 250) return const SizedBox.shrink();
                               return SideTitleWidget(
                                 meta: meta,
-                                child: Text('${value.toInt()}'),
+                                space: 8,
+                                child: Text(
+                                  '${value.toInt()}',
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
                               );
                             },
                           ),
