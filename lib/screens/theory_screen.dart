@@ -5,8 +5,9 @@ import 'exercise_screen.dart';
 
 class TheoryScreen extends StatelessWidget {
   final VedicItem item;
+  final Player player;
 
-  const TheoryScreen({super.key, required this.item});
+  const TheoryScreen({super.key, required this.item, required this.player});
 
   @override
   Widget build(BuildContext context) {
