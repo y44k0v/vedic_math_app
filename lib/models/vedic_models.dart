@@ -102,3 +102,35 @@ class SessionRecord {
     completedAt: DateTime.parse(map['completed_at'] as String),
   );
 }
+
+class Player {
+  final int? id;
+  final String uuid;
+  final String name;
+  final bool isActive;
+  final DateTime createdAt;
+
+  const Player({
+    this.id,
+    required this.uuid,
+    required this.name,
+    required this.isActive,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'uuid': uuid,
+    'name': name,
+    'is_active': isActive ? 1 : 0,
+    'created_at': createdAt.toIso8601String(),
+  };
+
+  factory Player.fromMap(Map<String, dynamic> map) => Player(
+    id: map['id'] as int?,
+    uuid: map['uuid'] as String,
+    name: map['name'] as String,
+    isActive: (map['is_active'] as int) == 1,
+    createdAt: DateTime.parse(map['created_at'] as String),
+  );
+}
