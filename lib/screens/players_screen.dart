@@ -35,60 +35,21 @@ class _PlayersScreenState extends State<PlayersScreen> {
   }
 
   Future<void> _showCreateOrEditDialog({Player? existing}) async {
-    final controller = TextEditingController(text: existing?.name ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    final saved = await showDialog<bool>(
+    final resultName = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(existing == null ? 'Add New Player' : 'Edit Player Name'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Player Name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Name cannot be empty' : null,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: Text(existing == null ? 'Add' : 'Save'),
-          ),
-        ],
-      ),
+      builder: (_) => _PlayerNameDialog(initialName: existing?.name),
     );
 
-    if (saved == true) {
-      if (existing == null) {
-        await DatabaseHelper.instance.createPlayer(
-          controller.text.trim(),
-          setActive: true,
-        );
-      } else {
-        await DatabaseHelper.instance.updatePlayerName(
-          existing.id!,
-          controller.text.trim(),
-        );
-      }
-      await _loadPlayers();
-      widget.onPlayersChanged();
+    if (resultName == null) return;
+
+    if (existing == null) {
+      await DatabaseHelper.instance.createPlayer(resultName, setActive: true);
+    } else {
+      await DatabaseHelper.instance.updatePlayerName(existing.id!, resultName);
     }
-    controller.dispose();
+
+    await _loadPlayers();
+    widget.onPlayersChanged();
   }
 
   Future<void> _confirmDelete(Player player) async {
@@ -223,6 +184,69 @@ class _PlayersScreenState extends State<PlayersScreen> {
         icon: const Icon(Icons.person_add_alt_1_rounded),
         label: const Text('Add Player'),
       ),
+    );
+  }
+}
+
+class _PlayerNameDialog extends StatefulWidget {
+  final String? initialName;
+
+  const _PlayerNameDialog({this.initialName});
+
+  @override
+  State<_PlayerNameDialog> createState() => _PlayerNameDialogState();
+}
+
+class _PlayerNameDialogState extends State<_PlayerNameDialog> {
+  late final TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.pop(context, _controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.initialName != null;
+
+    return AlertDialog(
+      title: Text(isEdit ? 'Edit Player Name' : 'Add New Player'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Player Name',
+            border: OutlineInputBorder(),
+          ),
+          validator: (v) =>
+              (v == null || v.trim().isEmpty) ? 'Name cannot be empty' : null,
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: Text(isEdit ? 'Save' : 'Add')),
+      ],
     );
   }
 }
