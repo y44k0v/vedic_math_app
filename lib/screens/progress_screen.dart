@@ -6,7 +6,9 @@ import '../database/db_helper.dart';
 import '../models/vedic_models.dart';
 
 class ProgressScreen extends StatefulWidget {
-  const ProgressScreen({super.key});
+  final Player player;
+
+  const ProgressScreen({super.key, required this.player});
 
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
@@ -22,8 +24,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
     _loadHistory();
   }
 
+  @override
+  void didUpdateWidget(covariant ProgressScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.player.id != widget.player.id) {
+      _loadHistory();
+    }
+  }
+
   Future<void> _loadHistory() async {
-    final list = await DatabaseHelper.instance.getSessionHistory();
+    setState(() => _loading = true);
+    final list = await DatabaseHelper.instance.getSessionHistory(
+      widget.player.id!,
+    );
     if (!mounted) return;
     setState(() {
       _sessions = list;
