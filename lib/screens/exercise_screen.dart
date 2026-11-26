@@ -37,9 +37,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   @override
   void initState() {
     super.initState();
-    _problems = List.generate(
-      totalQuestions,
-      (i) => _generator.generate(widget.item.id, i),
+    _problems = _generator.generateSession(
+      widget.item.id,
+      count: totalQuestions,
     );
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsedSeconds++);
@@ -183,6 +183,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     } else {
       _timer?.cancel();
       final record = SessionRecord(
+        playerId: widget.player.id!,
         itemId: widget.item.id,
         itemTitle: widget.item.sanskritName,
         score: _score,
