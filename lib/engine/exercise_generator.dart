@@ -3,7 +3,72 @@ import 'dart:math';
 import '../models/vedic_models.dart';
 
 class ExerciseGenerator {
-  final Random _rng = Random();
+  final Random _rng = Random.secure();
+  final Map<String, Set<String>> _recentByItem = {};
+
+  /// Generates [count] unique problems for [itemId] without repeats.
+  List<MathProblem> generateSession(String itemId, {int count = 25}) {
+    final sessionKeys = <String>{};
+    final recentKeys = _recentByItem.putIfAbsent(itemId, () => <String>{});
+    final List<MathProblem> problems = [];
+
+    for (int i = 0; i < count; i++) {
+      MathProblem? chosen;
+      String? chosenKey;
+
+      // Try up to 80 times to avoid both in-session AND recent-session repeats
+      for (int attempt = 0; attempt < 80; attempt++) {
+        final candidate = generate(itemId, i);
+        final key = _canonicalKey(candidate.prompt);
+        if (!sessionKeys.contains(key) && !recentKeys.contains(key)) {
+          chosen = candidate;
+          chosenKey = key;
+          break;
+        }
+      }
+
+      // Fallback: guarantee uniqueness within the current 25-question session
+      if (chosen == null) {
+        recentKeys.clear();
+        for (int attempt = 0; attempt < 80; attempt++) {
+          final candidate = generate(itemId, i);
+          final key = _canonicalKey(candidate.prompt);
+          if (!sessionKeys.contains(key)) {
+            chosen = candidate;
+            chosenKey = key;
+            break;
+          }
+        }
+      }
+
+      chosen ??= generate(itemId, i);
+      chosenKey ??= _canonicalKey(chosen.prompt);
+
+      sessionKeys.add(chosenKey);
+      recentKeys.add(chosenKey);
+      if (recentKeys.length > 50) {
+        recentKeys.remove(recentKeys.first);
+      }
+
+      problems.add(chosen);
+    }
+
+    return problems;
+  }
+
+  /// Normalizes commutative prompts (e.g. "94 × 97" == "97 × 94") so mirrored
+  /// pairs aren't treated as different exercises.
+  String _canonicalKey(String prompt) {
+    final multMatch = RegExp(r'(\d+)\s*×\s*(\d+)').firstMatch(prompt);
+    if (multMatch != null) {
+      final a = int.parse(multMatch.group(1)!);
+      final b = int.parse(multMatch.group(2)!);
+      final low = a < b ? a : b;
+      final high = a < b ? b : a;
+      return 'mul:$low:$high:${prompt.split('\n').first}';
+    }
+    return prompt;
+  }
 
   MathProblem generate(String itemId, int questionIndex) {
     switch (itemId) {
@@ -26,7 +91,7 @@ class ExerciseGenerator {
       case 's9':
         return _genChalana();
       case 's10':
-        return _genYavadunamCube();
+        return _genYavadunamCube(questionIndex);
       case 's11':
         return _genVyashti();
       case 's12':
@@ -50,7 +115,7 @@ class ExerciseGenerator {
       case 'ss5':
         return _genVestanam();
       case 'ss6':
-        return _genYavadunamMult();
+        return _genYavadunamMult(questionIndex);
       case 'ss7':
         return _genYavadunamSquare(questionIndex);
       case 'ss8':
@@ -71,6 +136,14 @@ class ExerciseGenerator {
 
   int _randRange(int min, int max) => min + _rng.nextInt(max - min + 1);
 
+  int _nonZeroDeviation(int maxAbs) {
+    int d = 0;
+    while (d == 0) {
+      d = _randRange(-maxAbs, maxAbs);
+    }
+    return d;
+  }
+
   int _digitSum(int n) {
     int x = n.abs();
     if (x == 0) return 0;
@@ -79,7 +152,8 @@ class ExerciseGenerator {
   }
 
   MathProblem _genEkadhikena(int idx) {
-    int prefix = idx < 12 ? _randRange(1, 9) : _randRange(10, 19);
+    // 39 distinct prefixes (15² .. 395²)
+    int prefix = idx < 10 ? _randRange(1, 14) : _randRange(10, 39);
     int n = prefix * 10 + 5;
     int ans = n * n;
     int left = prefix * (prefix + 1);
@@ -111,8 +185,8 @@ class ExerciseGenerator {
   }
 
   MathProblem _genUrdhva(int idx) {
-    int a = idx < 15 ? _randRange(12, 89) : _randRange(112, 399);
-    int b = _randRange(12, 89);
+    int a = idx < 15 ? _randRange(12, 98) : _randRange(112, 499);
+    int b = _randRange(12, 98);
     int ans = a * b;
     return MathProblem(
       prompt: 'Multiply: $a × $b',
@@ -120,17 +194,17 @@ class ExerciseGenerator {
       primaryAnswer: '$ans',
       hint: 'Apply Vertically & Crosswise right-to-left.',
       solutionSteps:
-          'Pad if needed and multiply vertically & crosswise:\n'
+          'Multiply vertically & crosswise:\n'
           'Units -> Crosswise pairs -> Leftmost vertical product = $ans.',
     );
   }
 
   MathProblem _genParavartya() {
-    int excess = _randRange(1, 4);
+    int excess = _randRange(1, 5);
     int divisor = _rng.nextBool()
         ? 10 + excess
-        : 100 + excess * 10 + _randRange(1, 3);
-    int q = _randRange(11, 29);
+        : 100 + excess * 10 + _randRange(1, 4);
+    int q = _randRange(11, 35);
     int r = _randRange(0, divisor - 1);
     int dividend = divisor * q + r;
     int base = divisor < 100 ? 10 : 100;
@@ -150,9 +224,9 @@ class ExerciseGenerator {
   }
 
   MathProblem _genShunyam() {
-    int xAns = _randRange(2, 12);
-    int d1 = _randRange(1, 4);
-    int d2 = d1 + _randRange(1, 3);
+    int xAns = _randRange(2, 18);
+    int d1 = _randRange(1, 6);
+    int d2 = d1 + _randRange(1, 5);
     int a = xAns + d1;
     int b = xAns - d1;
     int c = xAns + d2;
@@ -170,11 +244,11 @@ class ExerciseGenerator {
   }
 
   MathProblem _genAnurupye() {
-    int yAns = _randRange(1, 9);
-    int k = _randRange(2, 4);
-    int a = _randRange(2, 9);
-    int d = a + _randRange(1, 5);
-    int b = _randRange(2, 9);
+    int yAns = _randRange(1, 12);
+    int k = _randRange(2, 6);
+    int a = _randRange(2, 12);
+    int d = a + _randRange(1, 7);
+    int b = _randRange(2, 12);
     int c1 = b * yAns;
     int e = b * k;
     int c2 = c1 * k;
@@ -192,10 +266,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genSankalana() {
-    int xAns = _randRange(1, 9);
-    int yAns = _randRange(1, 9);
-    int a = _randRange(11, 29);
-    int b = a + _randRange(3, 12);
+    int xAns = _randRange(1, 12);
+    int yAns = _randRange(1, 12);
+    int a = _randRange(11, 35);
+    int b = a + _randRange(2, 15);
     int c1 = a * xAns + b * yAns;
     int c2 = b * xAns + a * yAns;
     return MathProblem(
@@ -212,11 +286,11 @@ class ExerciseGenerator {
   }
 
   MathProblem _genPuranapuranabhyam() {
-    int a = _randRange(12, 88);
+    int a = _randRange(12, 98);
     int comp = 10 - (a % 10);
     if (comp == 10) comp = 5;
-    int b = _randRange(1, 8) * 10 + comp;
-    int c = _randRange(11, 99);
+    int b = _randRange(1, 9) * 10 + comp;
+    int c = _randRange(11, 149);
     int ans = a + b + c;
     return MathProblem(
       prompt: 'Add mentally: $a + $b + $c',
@@ -230,10 +304,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genChalana() {
-    int a = _randRange(2, 7);
-    int b = _randRange(1, 9);
-    int c = _randRange(1, 15);
-    int k = _randRange(1, 6);
+    int a = _randRange(2, 9);
+    int b = _randRange(1, 15);
+    int c = _randRange(1, 25);
+    int k = _randRange(1, 9);
     int ans = 2 * a * k + b;
     return MathProblem(
       prompt: 'Find f\'($k) for f(x) = ${a}x² + ${b}x + $c',
@@ -246,17 +320,19 @@ class ExerciseGenerator {
     );
   }
 
-  MathProblem _genYavadunamCube() {
-    int d = _rng.nextBool() ? _randRange(1, 6) : -_randRange(1, 5);
-    int n = 100 + d;
+  MathProblem _genYavadunamCube(int idx) {
+    // 46+ distinct numbers across Base 100 and Base 1000
+    int base = idx < 15 ? 100 : 1000;
+    int d = base == 100 ? _nonZeroDeviation(14) : _nonZeroDeviation(9);
+    int n = base + d;
     int ans = n * n * n;
     return MathProblem(
       prompt: 'Compute $n³',
       answerType: AnswerType.integer,
       primaryAnswer: '$ans',
-      hint: 'Use (N + 2d) | 3d² | d³ around Base 100.',
+      hint: 'Use (N + 2d) | 3d² | d³ around Base $base.',
       solutionSteps:
-          '1. Base = 100, deviation d = $d.\n'
+          '1. Base = $base, deviation d = $d.\n'
           '2. Left: $n + ${2 * d} = ${n + 2 * d}.\n'
           '3. Middle: 3(${d * d}) = ${3 * d * d}.\n'
           '4. Right: ($d)³ = ${d * d * d} (adjust negative borrow if d < 0).\n'
@@ -265,14 +341,14 @@ class ExerciseGenerator {
   }
 
   MathProblem _genVyashti() {
-    int base = _rng.nextBool() ? 50 : 100;
-    int offset = _randRange(-3, 3);
+    int base = [50, 100, 200][_rng.nextInt(3)];
+    int offset = _randRange(-4, 4);
     int targetAvg = base + offset;
     List<int> devs = [
-      _randRange(-6, 6),
-      _randRange(-6, 6),
-      _randRange(-6, 6),
-      _randRange(-6, 6),
+      _randRange(-8, 8),
+      _randRange(-8, 8),
+      _randRange(-8, 8),
+      _randRange(-8, 8),
     ];
     int lastDev = 5 * offset - devs.reduce((a, b) => a + b);
     devs.add(lastDev);
@@ -291,9 +367,9 @@ class ExerciseGenerator {
   }
 
   MathProblem _genShesanyankena() {
-    int denom = [19, 29, 39, 49][_rng.nextInt(4)];
+    int denom = [19, 29, 39, 49, 59, 69, 79, 89][_rng.nextInt(8)];
     int num = _randRange(1, denom - 1);
-    int nth = _randRange(2, 4);
+    int nth = _randRange(2, 5);
     int rem = num;
     int digit = 0;
     List<int> digits = [];
@@ -316,7 +392,7 @@ class ExerciseGenerator {
   }
 
   MathProblem _genTimes12() {
-    int n = _randRange(112, 899);
+    int n = _randRange(112, 989);
     int ans = n * 12;
     return MathProblem(
       prompt: 'Multiply: $n × 12',
@@ -330,7 +406,7 @@ class ExerciseGenerator {
   }
 
   MathProblem _genEkanyunena(int idx) {
-    int mult = idx < 13 ? 99 : 999;
+    int mult = idx < 12 ? 99 : 999;
     int n = mult == 99 ? _randRange(12, 98) : _randRange(102, 998);
     int ans = n * mult;
     int comp = (mult + 1) - n;
@@ -348,11 +424,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genGunitasamuccayah() {
-    int a = _randRange(1, 6);
-    int b = _randRange(1, 8);
-    int c = _randRange(1, 6);
-    int d = _randRange(-5, 7);
-    if (d == 0) d = 3;
+    int a = _randRange(1, 8);
+    int b = _randRange(1, 10);
+    int c = _randRange(1, 8);
+    int d = _nonZeroDeviation(9);
     int ans = (a + b) * (c + d);
     String dStr = d >= 0 ? '+ $d' : '- ${d.abs()}';
     return MathProblem(
@@ -368,10 +443,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genGunakasamuccayah() {
-    int p = _randRange(1, 4);
-    int q = _randRange(1, 6);
-    int r = _randRange(1, 4);
-    int s = _randRange(1, 6);
+    int p = _randRange(1, 6);
+    int q = _randRange(1, 8);
+    int r = _randRange(1, 6);
+    int s = _randRange(1, 8);
     int a = p * r;
     int b = p * s + q * r;
     int c = q * s;
@@ -389,10 +464,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genAnurupyena() {
-    bool useFifty = _rng.nextBool();
-    if (useFifty) {
-      int d1 = _randRange(-7, -1);
-      int d2 = _randRange(-7, -1);
+    int choice = _rng.nextInt(3);
+    if (choice == 0) {
+      int d1 = _nonZeroDeviation(9);
+      int d2 = _nonZeroDeviation(9);
       int a = 50 + d1;
       int b = 50 + d2;
       int ans = a * b;
@@ -404,34 +479,37 @@ class ExerciseGenerator {
         solutionSteps:
             '1. Deviations from 50: $d1 and $d2.\n'
             '2. Cross-add: $a + ($d2) = ${a + d2}.\n'
-            '3. Halve left side (if odd, +50 to right side) and append (${d1 * d2}).\n'
+            '3. Halve left side (if odd, +50 to right side) and add (${d1 * d2}).\n'
             '4. Result = $ans.',
       );
     } else {
-      int d1 = _randRange(1, 9);
-      int d2 = _randRange(1, 9);
-      int a = 200 + d1;
-      int b = 200 + d2;
+      int mult = choice == 1 ? 2 : 3;
+      int base = 100 * mult;
+      int d1 = _randRange(1, 12);
+      int d2 = _randRange(1, 12);
+      int a = base + d1;
+      int b = base + d2;
       int ans = a * b;
       return MathProblem(
-        prompt: 'Multiply (Base 200): $a × $b',
+        prompt: 'Multiply (Base $base): $a × $b',
         answerType: AnswerType.integer,
         primaryAnswer: '$ans',
-        hint: 'Use Working Base 200 (2 × 100). Double the left side.',
+        hint:
+            'Use Working Base $base ($mult × 100). Multiply left side by $mult.',
         solutionSteps:
-            '1. Deviations from 200: +$d1 and +$d2.\n'
-            '2. Left: ($a + $d2) × 2 = ${(a + d2) * 2}.\n'
-            '3. Right: $d1 × $d2 = ${(d1 * d2).toString().padLeft(2, '0')}.\n'
+            '1. Deviations from $base: +$d1 and +$d2.\n'
+            '2. Left: ($a + $d2) × $mult = ${(a + d2) * mult}.\n'
+            '3. Right: $d1 × $d2 = ${d1 * d2} (carry if ≥ 100).\n'
             '4. Result = $ans.',
       );
     }
   }
 
   MathProblem _genSisyate() {
-    int a = _randRange(1, 5);
-    int b = _randRange(1, 9);
-    int c = _randRange(1, 12);
-    int k = _randRange(1, 5);
+    int a = _randRange(1, 7);
+    int b = _randRange(1, 12);
+    int c = _randRange(1, 18);
+    int k = _randRange(1, 7);
     int ans = a * k * k + b * k + c;
     return MathProblem(
       prompt:
@@ -445,10 +523,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genAdyamadyena() {
-    int p = _randRange(2, 5);
-    int q = _randRange(1, 6);
-    int r = _randRange(2, 5);
-    int kAns = _randRange(2, 8);
+    int p = _randRange(2, 7);
+    int q = _randRange(1, 9);
+    int r = _randRange(2, 7);
+    int kAns = _randRange(2, 12);
     int a = p * r;
     int b = p * kAns + q * r;
     int c = q * kAns;
@@ -479,11 +557,13 @@ class ExerciseGenerator {
   }
 
   MathProblem _genVestanam() {
-    int divisor = [7, 13, 19][_rng.nextInt(3)];
+    int divisor = [7, 13, 19, 29][_rng.nextInt(4)];
     bool isDivisible = _rng.nextBool();
-    int baseMult = divisor * _randRange(15, 85);
+    int baseMult = divisor * _randRange(15, 120);
     int n = isDivisible ? baseMult : baseMult + _randRange(1, divisor - 1);
-    String osc = divisor == 19 ? '+2' : (divisor == 13 ? '+4' : '-2');
+    String osc = divisor == 29
+        ? '+3'
+        : (divisor == 19 ? '+2' : (divisor == 13 ? '+4' : '-2'));
     return MathProblem(
       prompt: 'Is $n divisible by $divisor?',
       answerType: AnswerType.booleanYesNo,
@@ -495,28 +575,31 @@ class ExerciseGenerator {
     );
   }
 
-  MathProblem _genYavadunamMult() {
-    int d1 = -_randRange(2, 9);
-    int d2 = -_randRange(2, 9);
-    int a = 100 + d1;
-    int b = 100 + d2;
+  MathProblem _genYavadunamMult(int idx) {
+    int base = idx < 13 ? 100 : 1000;
+    int d1 = -_randRange(2, 15);
+    int d2 = -_randRange(2, 15);
+    int a = base + d1;
+    int b = base + d2;
     int ans = a * b;
+    int width = base == 100 ? 2 : 3;
     return MathProblem(
       prompt: 'Multiply: $a × $b',
       answerType: AnswerType.integer,
       primaryAnswer: '$ans',
-      hint: 'Left = $a + ($d2); Right = ($d1) × ($d2).',
+      hint: 'Left = $a + ($d2); Right = ($d1) × ($d2) ($width digits).',
       solutionSteps:
-          '1. Deficiencies from 100: $d1 and $d2.\n'
+          '1. Deficiencies from $base: $d1 and $d2.\n'
           '2. Left: $a + ($d2) = ${a + d2}.\n'
-          '3. Right: ($d1) × ($d2) = ${(d1 * d2).toString().padLeft(2, '0')}.\n'
+          '3. Right: ($d1) × ($d2) = ${d1 * d2} (carry if ≥ $base).\n'
           '4. Answer = $ans.',
     );
   }
 
   MathProblem _genYavadunamSquare(int idx) {
-    int base = idx < 15 ? 100 : 1000;
-    int d = _rng.nextBool() ? _randRange(1, 9) : -_randRange(1, 9);
+    // 76 distinct numbers across Base 100 and Base 1000
+    int base = idx < 14 ? 100 : 1000;
+    int d = _nonZeroDeviation(19);
     int n = base + d;
     int ans = n * n;
     int width = base == 100 ? 2 : 3;
@@ -528,13 +611,13 @@ class ExerciseGenerator {
       solutionSteps:
           '1. Base = $base, deviation d = $d.\n'
           '2. Left: $n + ($d) = ${n + d}.\n'
-          '3. Right: ($d)² = ${(d * d).toString().padLeft(width, '0')}.\n'
+          '3. Right: ($d)² = ${d * d} (padded/carried for $width digits).\n'
           '4. Answer = $ans.',
     );
   }
 
   MathProblem _genAntyayordashake() {
-    int prefix = _randRange(2, 11);
+    int prefix = _randRange(1, 25);
     int u1 = _randRange(1, 9);
     int u2 = 10 - u1;
     int a = prefix * 10 + u1;
@@ -553,15 +636,13 @@ class ExerciseGenerator {
   }
 
   MathProblem _genAntyayoreva() {
-    int xAns = _randRange(2, 12);
-    int c = _randRange(2, 6);
-    int d = c + _randRange(1, 4);
-    int a = _randRange(1, 9);
-    // Ensure (xAns + a) / (xAns + b) = c / d => choose scale m so xAns + a = m*c
-    int m = _randRange(2, 5);
+    int xAns = _randRange(2, 16);
+    int c = _randRange(2, 7);
+    int d = c + _randRange(1, 5);
+    int m = _randRange(2, 6);
     int num = m * c;
     int den = m * d;
-    a = num - xAns;
+    int a = num - xAns;
     int b = den - xAns;
     String aStr = a >= 0 ? '+ $a' : '- ${a.abs()}';
     String bStr = b >= 0 ? '+ $b' : '- ${b.abs()}';
@@ -578,10 +659,10 @@ class ExerciseGenerator {
   }
 
   MathProblem _genSamuccayagunitah() {
-    int a = _randRange(1, 5);
-    int b = _randRange(1, 7);
-    int c = _randRange(1, 5);
-    int d = _randRange(1, 7);
+    int a = _randRange(1, 7);
+    int b = _randRange(1, 9);
+    int c = _randRange(1, 7);
+    int d = _randRange(1, 9);
     int p = a * c;
     int q = a * d + b * c;
     int r = b * d;
@@ -597,12 +678,12 @@ class ExerciseGenerator {
   }
 
   MathProblem _genLopana() {
-    int xAns = _randRange(1, 8);
-    int yAns = _randRange(1, 8);
-    int a1 = _randRange(2, 5);
-    int b1 = _randRange(1, 4);
-    int a2 = _randRange(2, 5);
-    int b2 = -b1; // Clean elimination by addition
+    int xAns = _randRange(1, 12);
+    int yAns = _randRange(1, 12);
+    int a1 = _randRange(2, 7);
+    int b1 = _randRange(1, 6);
+    int a2 = _randRange(2, 7);
+    int b2 = -b1;
     int c1 = a1 * xAns + b1 * yAns;
     int c2 = a2 * xAns + b2 * yAns;
     return MathProblem(
@@ -619,7 +700,7 @@ class ExerciseGenerator {
 
   MathProblem _genVilokanam(int idx) {
     if (idx.isEven) {
-      int root = _randRange(32, 99);
+      int root = _randRange(22, 99);
       int sq = root * root;
       int prefix = root ~/ 10;
       return MathProblem(
@@ -650,8 +731,8 @@ class ExerciseGenerator {
   }
 
   MathProblem _genDigitSum() {
-    int a = _randRange(123, 987);
-    int b = _randRange(123, 987);
+    int a = _randRange(123, 9876);
+    int b = _randRange(123, 9876);
     int dsA = _digitSum(a);
     int dsB = _digitSum(b);
     int ans = _digitSum(dsA * dsB);
