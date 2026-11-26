@@ -14,7 +14,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.vedic_math_app"
+    namespace = "com.data_dev_labs.vedic_math_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
