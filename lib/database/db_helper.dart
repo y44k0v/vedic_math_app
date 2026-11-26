@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/vedic_models.dart';
 
@@ -7,6 +8,7 @@ class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
+  static const _uuid = Uuid();
   static Database? _db;
 
   Future<Database> get database async {
@@ -21,32 +23,252 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE session_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_id TEXT NOT NULL,
-            item_title TEXT NOT NULL,
-            score INTEGER NOT NULL,
-            correct_count INTEGER NOT NULL,
-            total_questions INTEGER NOT NULL,
-            duration_seconds INTEGER NOT NULL,
-            completed_at TEXT NOT NULL
-          )
-        ''');
-
-        await db.execute('''
-          CREATE TABLE item_progress (
-            item_id TEXT PRIMARY KEY,
-            best_score INTEGER NOT NULL,
-            attempts INTEGER NOT NULL,
-            last_completed_at TEXT NOT NULL
-          )
-        ''');
+        await _createV2Tables(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _migrateV1ToV2(db);
+        }
       },
     );
   }
+
+  Future<void> _createV2Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE session_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        item_id TEXT NOT NULL,
+        item_title TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        correct_count INTEGER NOT NULL,
+        total_questions INTEGER NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        completed_at TEXT NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE item_progress (
+        player_id INTEGER NOT NULL,
+        item_id TEXT NOT NULL,
+        best_score INTEGER NOT NULL,
+        attempts INTEGER NOT NULL,
+        last_completed_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, item_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _migrateV1ToV2(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE players (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      ''');
+
+      // Preserve any v1 scores under a default Player 1
+      final defaultPlayerId = await txn.insert('players', {
+        'uuid': _uuid.v4(),
+        'name': 'Player 1',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      await txn.execute('''
+        CREATE TABLE session_history_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          player_id INTEGER NOT NULL,
+          item_id TEXT NOT NULL,
+          item_title TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          correct_count INTEGER NOT NULL,
+          total_questions INTEGER NOT NULL,
+          duration_seconds INTEGER NOT NULL,
+          completed_at TEXT NOT NULL,
+          FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        INSERT INTO session_history_new
+          (id, player_id, item_id, item_title, score, correct_count, total_questions, duration_seconds, completed_at)
+        SELECT id, $defaultPlayerId, item_id, item_title, score, correct_count, total_questions, duration_seconds, completed_at
+        FROM session_history
+      ''');
+      await txn.execute('DROP TABLE session_history');
+      await txn.execute(
+        'ALTER TABLE session_history_new RENAME TO session_history',
+      );
+
+      await txn.execute('''
+        CREATE TABLE item_progress_new (
+          player_id INTEGER NOT NULL,
+          item_id TEXT NOT NULL,
+          best_score INTEGER NOT NULL,
+          attempts INTEGER NOT NULL,
+          last_completed_at TEXT NOT NULL,
+          PRIMARY KEY (player_id, item_id),
+          FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        INSERT INTO item_progress_new
+          (player_id, item_id, best_score, attempts, last_completed_at)
+        SELECT $defaultPlayerId, item_id, best_score, attempts, last_completed_at
+        FROM item_progress
+      ''');
+      await txn.execute('DROP TABLE item_progress');
+      await txn.execute(
+        'ALTER TABLE item_progress_new RENAME TO item_progress',
+      );
+    });
+  }
+
+  // ========================
+  // PLAYER CRUD OPERATIONS
+  // ========================
+
+  Future<Player> createPlayer(String name, {bool setActive = true}) async {
+    final db = await database;
+    final cleanName = name.trim();
+    final newUuid = _uuid.v4();
+    final now = DateTime.now();
+
+    late int newId;
+    await db.transaction((txn) async {
+      if (setActive) {
+        await txn.update('players', {'is_active': 0});
+      }
+      newId = await txn.insert('players', {
+        'uuid': newUuid,
+        'name': cleanName,
+        'is_active': setActive ? 1 : 0,
+        'created_at': now.toIso8601String(),
+      });
+    });
+
+    return Player(
+      id: newId,
+      uuid: newUuid,
+      name: cleanName,
+      isActive: setActive,
+      createdAt: now,
+    );
+  }
+
+  Future<List<Player>> getAllPlayers() async {
+    final db = await database;
+    final rows = await db.query('players', orderBy: 'created_at ASC');
+    return rows.map((row) => Player.fromMap(row)).toList();
+  }
+
+  Future<Player?> getActivePlayer() async {
+    final db = await database;
+    final activeRows = await db.query(
+      'players',
+      where: 'is_active = 1',
+      limit: 1,
+    );
+    if (activeRows.isNotEmpty) {
+      return Player.fromMap(activeRows.first);
+    }
+
+    final anyRows = await db.query('players', orderBy: 'id ASC', limit: 1);
+    if (anyRows.isNotEmpty) {
+      final first = Player.fromMap(anyRows.first);
+      await setActivePlayer(first.id!);
+      return Player(
+        id: first.id,
+        uuid: first.uuid,
+        name: first.name,
+        isActive: true,
+        createdAt: first.createdAt,
+      );
+    }
+    return null;
+  }
+
+  Future<void> setActivePlayer(int playerId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.update('players', {'is_active': 0});
+      await txn.update(
+        'players',
+        {'is_active': 1},
+        where: 'id = ?',
+        whereArgs: [playerId],
+      );
+    });
+  }
+
+  Future<void> updatePlayerName(int playerId, String newName) async {
+    final db = await database;
+    await db.update(
+      'players',
+      {'name': newName.trim()},
+      where: 'id = ?',
+      whereArgs: [playerId],
+    );
+  }
+
+  Future<void> deletePlayer(int playerId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'players',
+        where: 'id = ?',
+        whereArgs: [playerId],
+      );
+      final wasActive =
+          rows.isNotEmpty && (rows.first['is_active'] as int) == 1;
+
+      await txn.delete('players', where: 'id = ?', whereArgs: [playerId]);
+
+      if (wasActive) {
+        final remaining = await txn.query(
+          'players',
+          orderBy: 'id ASC',
+          limit: 1,
+        );
+        if (remaining.isNotEmpty) {
+          await txn.update(
+            'players',
+            {'is_active': 1},
+            where: 'id = ?',
+            whereArgs: [remaining.first['id']],
+          );
+        }
+      }
+    });
+  }
+
+  // ========================
+  // PLAYER-SCOPED SCORES
+  // ========================
 
   Future<void> saveSessionResult(SessionRecord record) async {
     final db = await database;
@@ -56,12 +278,13 @@ class DatabaseHelper {
 
       final existing = await txn.query(
         'item_progress',
-        where: 'item_id = ?',
-        whereArgs: [record.itemId],
+        where: 'player_id = ? AND item_id = ?',
+        whereArgs: [record.playerId, record.itemId],
       );
 
       if (existing.isEmpty) {
         await txn.insert('item_progress', {
+          'player_id': record.playerId,
           'item_id': record.itemId,
           'best_score': record.score,
           'attempts': 1,
@@ -77,30 +300,52 @@ class DatabaseHelper {
             'attempts': prevAttempts + 1,
             'last_completed_at': record.completedAt.toIso8601String(),
           },
-          where: 'item_id = ?',
-          whereArgs: [record.itemId],
+          where: 'player_id = ? AND item_id = ?',
+          whereArgs: [record.playerId, record.itemId],
         );
       }
     });
   }
 
-  Future<List<SessionRecord>> getSessionHistory() async {
+  Future<List<SessionRecord>> getSessionHistory(int playerId) async {
     final db = await database;
-    final rows = await db.query('session_history', orderBy: 'completed_at ASC');
+    final rows = await db.query(
+      'session_history',
+      where: 'player_id = ?',
+      whereArgs: [playerId],
+      orderBy: 'completed_at ASC',
+    );
     return rows.map((row) => SessionRecord.fromMap(row)).toList();
   }
 
-  Future<Map<String, Map<String, dynamic>>> getAllItemProgress() async {
+  Future<Map<String, Map<String, dynamic>>> getAllItemProgress(
+    int playerId,
+  ) async {
     final db = await database;
-    final rows = await db.query('item_progress');
+    final rows = await db.query(
+      'item_progress',
+      where: 'player_id = ?',
+      whereArgs: [playerId],
+    );
     return {for (final row in rows) row['item_id'] as String: row};
   }
 
-  Future<int> getTotalScore() async {
+  Future<int> getTotalScore(int playerId) async {
     final db = await database;
     final result = await db.rawQuery(
-      'SELECT COALESCE(SUM(score), 0) AS total FROM session_history',
+      'SELECT COALESCE(SUM(score), 0) AS total FROM session_history WHERE player_id = ?',
+      [playerId],
     );
     return (result.first['total'] as int?) ?? 0;
+  }
+
+  Future<Map<int, int>> getAllPlayersTotalScores() async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT player_id, COALESCE(SUM(score), 0) AS total FROM session_history GROUP BY player_id',
+    );
+    return {
+      for (final row in rows) row['player_id'] as int: row['total'] as int,
+    };
   }
 }
