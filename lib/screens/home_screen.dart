@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late Player _activePlayer;
   List<Player> _allPlayers = [];
   int _selectedTab = 0;
+  int _refreshTick = 0;
   VedicCategory? _filterCategory;
   Map<String, Map<String, dynamic>> _progressMap = {};
   int _totalScore = 0;
@@ -55,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _allPlayers = players;
       _progressMap = progress;
       _totalScore = total;
+      _refreshTick++;
     });
   }
 
@@ -68,13 +70,21 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           PopupMenuButton<String>(
             tooltip: 'Player Menu',
-            child: Chip(
-              avatar: const Icon(Icons.person_rounded, size: 18),
-              label: Text('${_activePlayer.name} • $_totalScore pts'),
+            constraints: const BoxConstraints(minWidth: 200),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 190),
+              child: Chip(
+                avatar: const Icon(Icons.person_rounded, size: 18),
+                label: Text(
+                  '${_activePlayer.name} • $_totalScore pts',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
             onSelected: (value) async {
               if (value == 'manage') {
                 setState(() => _selectedTab = 2);
+                await _loadPlayerAndProgress();
               } else {
                 final id = int.parse(value);
                 await DatabaseHelper.instance.setActivePlayer(id);
@@ -94,7 +104,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 18,
                       ),
                       const SizedBox(width: 8),
-                      Text(p.name),
+                      Expanded(
+                        child: Text(p.name, overflow: TextOverflow.ellipsis),
+                      ),
                     ],
                   ),
                 ),
@@ -106,7 +118,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Icon(Icons.manage_accounts_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Manage Players (CRUD)'),
+                    Expanded(
+                      child: Text(
+                        'Manage Players',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -115,19 +132,22 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedTab,
-        children: [
-          _buildLearnTab(context),
-          ProgressScreen(player: _activePlayer),
-          PlayersScreen(onPlayersChanged: _loadPlayerAndProgress),
-        ],
-      ),
+      body: switch (_selectedTab) {
+        0 => _buildLearnTab(context),
+        1 => ProgressScreen(
+          key: ValueKey('progress_${_activePlayer.id}_$_refreshTick'),
+          player: _activePlayer,
+        ),
+        _ => PlayersScreen(
+          key: ValueKey('players_${_activePlayer.id}_$_refreshTick'),
+          onPlayersChanged: _loadPlayerAndProgress,
+        ),
+      },
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (idx) {
           setState(() => _selectedTab = idx);
-          if (idx == 0) _loadPlayerAndProgress();
+          _loadPlayerAndProgress();
         },
         destinations: const [
           NavigationDestination(
@@ -252,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             TheoryScreen(item: item, player: _activePlayer),
                       ),
                     );
-                    _loadPlayerAndProgress();
+                    await _loadPlayerAndProgress();
                   },
                 ),
               );
