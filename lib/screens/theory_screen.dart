@@ -114,7 +114,9 @@ class TheoryScreen extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ExerciseScreen(item: item)),
+            MaterialPageRoute(
+              builder: (_) => ExerciseScreen(item: item, player: player),
+            ),
           );
         },
         icon: const Icon(Icons.timer_outlined),
