@@ -125,7 +125,7 @@ class _MultiplayerArenaScreenState extends State<MultiplayerArenaScreen> {
                         vertical: 8,
                       ),
                       itemCount: snap.competitors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (_, i) {
                         final c = snap.competitors[i];
                         final isMe =
