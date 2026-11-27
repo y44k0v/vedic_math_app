@@ -152,8 +152,8 @@ class ExerciseGenerator {
   }
 
   MathProblem _genEkadhikena(int idx) {
-    // 39 distinct prefixes (15² .. 395²)
-    int prefix = idx < 10 ? _randRange(1, 14) : _randRange(10, 39);
+    // 99 distinct prefixes (15² .. 995²)
+    int prefix = idx < 8 ? _randRange(1, 19) : _randRange(15, 99);
     int n = prefix * 10 + 5;
     int ans = n * n;
     int left = prefix * (prefix + 1);
