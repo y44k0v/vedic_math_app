@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -43,6 +44,12 @@ class DatabaseHelper {
         }
       },
     );
+  }
+
+  @visibleForTesting
+  Future<void> resetForTesting() async {
+    await _db?.close();
+    _db = null;
   }
 
   Future<void> _createV2Tables(Database db) async {
