@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/vedic_catalog.dart';
 import '../database/db_helper.dart';
 import '../models/vedic_models.dart';
+import 'multiplayer_lobby_screen.dart';
 import 'players_screen.dart';
 import 'progress_screen.dart';
 import 'theory_screen.dart';
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['Vedic Mathematics', 'Progress', 'Players'];
+    final titles = ['Vedic Mathematics', 'Multiplayer', 'Progress', 'Players'];
 
     return Scaffold(
       appBar: AppBar(
@@ -134,7 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: switch (_selectedTab) {
         0 => _buildLearnTab(context),
-        1 => ProgressScreen(
+        1 => MultiplayerLobbyScreen(
+          key: ValueKey('mp_${_activePlayer.id}_$_refreshTick'),
+          player: _activePlayer,
+          onMatchFinished: _loadPlayerAndProgress,
+        ),
+        2 => ProgressScreen(
           key: ValueKey('progress_${_activePlayer.id}_$_refreshTick'),
           player: _activePlayer,
         ),
@@ -153,7 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book_rounded),
-            label: 'Learn & Drill',
+            label: 'Learn',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports_rounded),
+            label: 'Multiplayer',
           ),
           NavigationDestination(
             icon: Icon(Icons.show_chart_outlined),
