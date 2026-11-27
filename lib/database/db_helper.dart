@@ -10,7 +10,11 @@ import '../models/multiplayer_models.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
-  static final DatabaseHelper instance = DatabaseHelper._();
+
+  @visibleForTesting
+  DatabaseHelper.forTesting();
+
+  static DatabaseHelper instance = DatabaseHelper._();
 
   static const _uuid = Uuid();
   static Database? _db;
