@@ -1,10 +1,29 @@
 # Vedic Math Mastery
 
-A Flutter project. Includes background guide in this repo and short background in the app. Created to assist to permform faster mental calculations.
+[![Release](https://img.shields.io/github/v/release/y44k0v/vedic_math_app)](https://github.com/y44k0v/vedic_math_app/releases)
+![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)
 
-Only android icons included. Use dart to generate other platform icons via flutter launcher icons package, the randomness of excercises needs some work (fixed in v1.1.0).
+A Flutter application designed to help you learn and practice **Vedic Mathematics** for faster mental calculations. Includes a comprehensive theoretical guide in this repository alongside built-in theory, worked examples, timed 25-exercise drills, progress charts, multi-player profiles, and local WiFi multiplayer races.
 
-![Alt text](assets/icon/icon_monochrome.png)
+<img src="assets/icon/icon_monochrome.png" alt="Vedic Math Mastery Icon" width="120" />
+
+> **Icons Note:** Only Android launcher icons are bundled in this repository. To generate icons for additional platforms, configure and run `flutter_launcher_icons`.
+
+---
+
+## Changelog
+
+## [1.2.0] - 2026-11-27
+
+### Added
+
+- **Local WiFi Multiplayer:** Added Host/Client real-time racing over WiFi using an authoritative Host server (`HttpServer` + `WebSocket`), monotonic server-side arrival timing, half-RTT latency compensation (`250ms` grace window), live competitor scoreboard, and resumable matches by Match ID (`v2 → v3` SQLite migration).
+- **Comprehensive Test Suite:** Added unit, SQLite migration, real WebSocket protocol, and widget test batteries (`generator_test.dart`, `database_test.dart`, `multiplayer_protocol_test.dart`, and `widget_test.dart`).
+
+### Fixed
+
+- **Android Activity & Schema:** Aligned `MainActivity.kt` package with `com.data_dev_labs.vedic_math_app` and updated SQLite `onCreate` to initialize both v2 and v3 tables on fresh installs.
+- **UI & Widget Test Stability:** Fixed widget-test `FakeAsync` isolation with `FakeDatabaseHelper` and resolved remaining analyzer deprecations.
 
 ## [1.1.0] - 2026-11-26
 
@@ -12,7 +31,7 @@ Only android icons included. Use dart to generate other platform icons via flutt
 
 - **Multi-Player Profiles:** Added SQLite `players` table (`id`, `uuid`, `name`, `is_active`) with automatic `v1 → v2` database migration.
 - **First-Launch Player Setup:** Added onboarding screen (`PlayerInitScreen`) to initialize the first player on startup.
-- **Player Management & Menu:** Added `Players` tab and AppBar player-switcher menu supporting full Create, Read, Update, Delete, and instant profile switching.
+- **Player Management & Menu:** Added `Players` tab and AppBar player-switcher menu supporting full profile management and instant switching.
 - **Per-Player Score Tracking:** Scoped `session_history` and `item_progress` to `player_id` with cascade deletion.
 
 ### Improved
@@ -25,11 +44,4 @@ Only android icons included. Use dart to generate other platform icons via flutt
 - **Android Edge-to-Edge & Button Layout:** Added `SafeArea` and scrollable containers to `ExerciseScreen` and the Vedic Solution bottom sheet; prevented `"Solution"` button text from wrapping onto 2 lines.
 - **Player Menu & Dialog Stability:** Fixed 6.7px right overflow in the AppBar player menu, removed `(CRUD)` label text, and fixed the red-screen `TextEditingController` crash on Edit → Cancel.
 - **Progress Chart Y-Axis:** Widened `leftTitles` (`reservedSize: 48`) so 3-digit numbers (`150`, `200`, `250`) render on a single line.
-- **Android Build & CI:** Removed hyphens from `applicationId`/`namespace` (`com.datadevlabs.vedic_math_app`) and fixed `$` password escaping in the GitHub Actions keystore step.
-
-### [1.2.0] 2026-11-27
-
-- **WiFi Multiplayer:** Added local WiFi Host/Client racing with authoritative server timing, half-RTT latency fairness, live competitor scoreboard, and resumable matches by Match ID.
-- **Multi-Player Profiles:** Added SQLite player profiles (`UUID` + name), first-launch onboarding, quick-switch menu, and full profile management (v1 → v3 DB migration).
-- **Improved Randomness & Tests:** Eliminated duplicate exercises within 25-question drills and added unit, SQLite, WebSocket, and widget tests.
-- **Fixes:** Resolved Android edge-to-edge button cutoff, `"Solution"` text wrapping, delayed score refreshes, Edit → Cancel dialog crash, chart Y-axis wrapping, and `MainActivity` package mismatch.
+- **Android Build & CI:** Removed hyphens from `applicationId`/`namespace` and fixed `$` password escaping in the GitHub Actions keystore step.
