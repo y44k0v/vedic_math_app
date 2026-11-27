@@ -2,7 +2,10 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
+import 'dart:convert';
+
 import '../models/vedic_models.dart';
+import '../models/multiplayer_models.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
@@ -23,15 +26,15 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: (db, version) async {
-        await _createV2Tables(db);
+        await _createV3Tables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
+        if (oldVersion < 3) {
           await _migrateV1ToV2(db);
         }
       },
@@ -347,5 +350,196 @@ class DatabaseHelper {
     return {
       for (final row in rows) row['player_id'] as int: row['total'] as int,
     };
+  }
+
+  Future<void> _createV3Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS multiplayer_matches (
+        match_id TEXT PRIMARY KEY,
+        host_ip TEXT NOT NULL,
+        port INTEGER NOT NULL,
+        item_id TEXT NOT NULL,
+        item_title TEXT NOT NULL,
+        is_host INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        current_question_index INTEGER NOT NULL,
+        total_questions INTEGER NOT NULL,
+        current_question_json TEXT,
+        problems_json TEXT,
+        recorded_in_history INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS multiplayer_participants (
+        match_id TEXT NOT NULL,
+        player_uuid TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        correct_wins INTEGER NOT NULL,
+        latency_ms INTEGER NOT NULL DEFAULT 0,
+        is_connected INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (match_id, player_uuid),
+        FOREIGN KEY (match_id) REFERENCES multiplayer_matches (match_id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> upsertMatchSnapshot(
+    MatchSnapshot snapshot, {
+    List<MathProblem>? hostProblems,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final existing = await txn.query(
+        'multiplayer_matches',
+        columns: ['problems_json', 'recorded_in_history'],
+        where: 'match_id = ?',
+        whereArgs: [snapshot.matchId],
+      );
+
+      final existingProblemsJson = existing.isNotEmpty
+          ? existing.first['problems_json'] as String?
+          : null;
+      final existingRecorded = existing.isNotEmpty
+          ? ((existing.first['recorded_in_history'] as int) == 1)
+          : false;
+
+      await txn.insert('multiplayer_matches', {
+        'match_id': snapshot.matchId,
+        'host_ip': snapshot.hostIp,
+        'port': snapshot.port,
+        'item_id': snapshot.itemId,
+        'item_title': snapshot.itemTitle,
+        'is_host': snapshot.isHost ? 1 : 0,
+        'status': snapshot.status.name,
+        'current_question_index': snapshot.currentQuestionIndex,
+        'total_questions': snapshot.totalQuestions,
+        'current_question_json': snapshot.currentQuestion != null
+            ? jsonEncode(snapshot.currentQuestion!.toJson())
+            : null,
+        'problems_json': hostProblems != null
+            ? jsonEncode(hostProblems.map((p) => p.toJson()).toList())
+            : existingProblemsJson,
+        'recorded_in_history': (snapshot.recordedInHistory || existingRecorded)
+            ? 1
+            : 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      await txn.delete(
+        'multiplayer_participants',
+        where: 'match_id = ?',
+        whereArgs: [snapshot.matchId],
+      );
+
+      for (final c in snapshot.competitors) {
+        await txn.insert('multiplayer_participants', {
+          'match_id': snapshot.matchId,
+          'player_uuid': c.playerUuid,
+          'player_name': c.playerName,
+          'score': c.score,
+          'correct_wins': c.correctWins,
+          'latency_ms': c.latencyMs,
+          'is_connected': c.isConnected ? 1 : 0,
+        });
+      }
+    });
+  }
+
+  Future<MatchSnapshot?> getLatestResumableMatch() async {
+    final db = await database;
+    final rows = await db.query(
+      'multiplayer_matches',
+      where: 'status != ?',
+      whereArgs: [MatchStatus.finished.name],
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _hydrateMatchRow(db, rows.first);
+  }
+
+  Future<List<MatchSnapshot>> getRecentMultiplayerMatches() async {
+    final db = await database;
+    final rows = await db.query(
+      'multiplayer_matches',
+      orderBy: 'updated_at DESC',
+      limit: 15,
+    );
+    final List<MatchSnapshot> list = [];
+    for (final row in rows) {
+      list.add(await _hydrateMatchRow(db, row));
+    }
+    return list;
+  }
+
+  Future<List<MathProblem>?> loadHostProblems(String matchId) async {
+    final db = await database;
+    final rows = await db.query(
+      'multiplayer_matches',
+      columns: ['problems_json'],
+      where: 'match_id = ?',
+      whereArgs: [matchId],
+    );
+    if (rows.isEmpty) return null;
+    final raw = rows.first['problems_json'] as String?;
+    if (raw == null) return null;
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    return decoded
+        .map((e) => MathProblem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> markMatchRecordedInHistory(String matchId) async {
+    final db = await database;
+    await db.update(
+      'multiplayer_matches',
+      {'recorded_in_history': 1},
+      where: 'match_id = ?',
+      whereArgs: [matchId],
+    );
+  }
+
+  Future<MatchSnapshot> _hydrateMatchRow(
+    Database db,
+    Map<String, dynamic> row,
+  ) async {
+    final matchId = row['match_id'] as String;
+    final compRows = await db.query(
+      'multiplayer_participants',
+      where: 'match_id = ?',
+      whereArgs: [matchId],
+      orderBy: 'score DESC, correct_wins DESC',
+    );
+    final qRaw = row['current_question_json'] as String?;
+    return MatchSnapshot(
+      matchId: matchId,
+      hostIp: row['host_ip'] as String,
+      port: row['port'] as int,
+      itemId: row['item_id'] as String,
+      itemTitle: row['item_title'] as String,
+      isHost: (row['is_host'] as int) == 1,
+      status: MatchStatus.values.byName(row['status'] as String),
+      currentQuestionIndex: row['current_question_index'] as int,
+      totalQuestions: row['total_questions'] as int,
+      currentQuestion: qRaw != null
+          ? PublicQuestion.fromJson(jsonDecode(qRaw) as Map<String, dynamic>)
+          : null,
+      competitors: compRows
+          .map(
+            (c) => CompetitorScore(
+              playerUuid: c['player_uuid'] as String,
+              playerName: c['player_name'] as String,
+              score: c['score'] as int,
+              correctWins: c['correct_wins'] as int,
+              latencyMs: c['latency_ms'] as int,
+              isConnected: (c['is_connected'] as int) == 1,
+            ),
+          )
+          .toList(),
+      recordedInHistory: (row['recorded_in_history'] as int) == 1,
+    );
   }
 }
