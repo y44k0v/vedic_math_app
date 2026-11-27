@@ -1,4 +1,4 @@
-package com.example.vedic_math_app
+package com.data_dev_labs.vedic_math_app
 
 import io.flutter.embedding.android.FlutterActivity
 
