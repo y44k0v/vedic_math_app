@@ -47,12 +47,9 @@ void main() {
     'Full multiplayer lifecycle: join, wrong/correct answer, rejoin & finish',
     () async {
       final hostPlayer = await DatabaseHelper.instance.createPlayer('Host');
-      final guestPlayer = Player(
-        id: 99,
-        uuid: 'guest-uuid-1234',
-        name: 'Guest',
-        isActive: true,
-        createdAt: DateTime(2026),
+      final guestPlayer = await DatabaseHelper.instance.createPlayer(
+        'Guest',
+        setActive: false,
       );
 
       final server = MatchServer(
