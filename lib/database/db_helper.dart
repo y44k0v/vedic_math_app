@@ -31,11 +31,15 @@ class DatabaseHelper {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: (db, version) async {
+        await _createV2Tables(db);
         await _createV3Tables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 3) {
+        if (oldVersion < 2) {
           await _migrateV1ToV2(db);
+        }
+        if (oldVersion < 3) {
+          await _createV3Tables(db);
         }
       },
     );
