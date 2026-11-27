@@ -45,7 +45,15 @@ class _CorrectSubmission {
 
 class MatchServer {
   static const int defaultPort = 8080;
-  static const Duration _graceWindow = Duration(milliseconds: 250);
+  // static const Duration _graceWindow = Duration(milliseconds: 250);
+
+  final Duration graceWindow;
+  final Duration advanceDelay;
+
+  MatchServer({
+    this.graceWindow = const Duration(milliseconds: 250),
+    this.advanceDelay = const Duration(seconds: 2),
+  });
 
   final Stopwatch _clock = Stopwatch()..start();
   HttpServer? _httpServer;
@@ -153,6 +161,7 @@ class MatchServer {
 
   Future<void> _bindAndServe() async {
     _httpServer = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    port = _httpServer!.port; // Captures actual port if port == 0
     _httpServer!.listen((HttpRequest request) async {
       if (WebSocketTransformer.isUpgradeRequest(request)) {
         final ws = await WebSocketTransformer.upgrade(request);
@@ -324,7 +333,7 @@ class MatchServer {
         });
 
         // Start 250ms grace window on the first correct answer
-        _graceTimer ??= Timer(_graceWindow, _resolveCurrentRound);
+        _graceTimer ??= Timer(graceWindow, _resolveCurrentRound);
         break;
     }
   }
@@ -357,7 +366,7 @@ class MatchServer {
     );
 
     // Show round winner & solution briefly, then advance
-    _advanceTimer = Timer(const Duration(seconds: 2), () async {
+    _advanceTimer = Timer(advanceDelay, () async {
       _roundWinnersBuffer.clear();
       if (currentQuestionIndex + 1 >= _problems.length) {
         status = MatchStatus.finished;
