@@ -200,7 +200,7 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<VedicItem>(
-                  value: _selectedItem,
+                  initialValue: _selectedItem,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Select Sutra / Sub-Sutra',
