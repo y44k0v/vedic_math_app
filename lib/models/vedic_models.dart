@@ -57,6 +57,24 @@ class MathProblem {
     required this.solutionSteps,
     required this.hint,
   });
+
+  Map<String, dynamic> toJson() => {
+    'prompt': prompt,
+    'answerType': answerType.name,
+    'primaryAnswer': primaryAnswer,
+    'secondaryAnswer': secondaryAnswer,
+    'solutionSteps': solutionSteps,
+    'hint': hint,
+  };
+
+  factory MathProblem.fromJson(Map<String, dynamic> json) => MathProblem(
+    prompt: json['prompt'] as String,
+    answerType: AnswerType.values.byName(json['answerType'] as String),
+    primaryAnswer: json['primaryAnswer'] as String,
+    secondaryAnswer: json['secondaryAnswer'] as String?,
+    solutionSteps: json['solutionSteps'] as String,
+    hint: json['hint'] as String,
+  );
 }
 
 class SessionRecord {
