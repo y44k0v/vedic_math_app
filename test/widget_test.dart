@@ -34,12 +34,18 @@ void main() {
     }
   });
 
+  Future<void> flushRealAsync(WidgetTester tester) async {
+    await tester.runAsync(
+      () => Future.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('First launch shows PlayerInitScreen and transitions to Home', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const VedicMathApp());
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await flushRealAsync(tester);
 
     expect(find.text('Welcome to Vedic Math'), findsOneWidget);
 
@@ -51,7 +57,7 @@ void main() {
     // Create first player
     await tester.enterText(find.byType(TextFormField), 'Aarav');
     await tester.tap(find.text('Start Learning'));
-    await tester.pumpAndSettle();
+    await flushRealAsync(tester);
 
     expect(find.text('Vedic Mathematics'), findsOneWidget);
     expect(find.textContaining('Aarav'), findsWidgets);
@@ -66,12 +72,14 @@ void main() {
   testWidgets('ExerciseScreen scores +10 pts, runs timer, and opens Solution', (
     WidgetTester tester,
   ) async {
-    final player = await DatabaseHelper.instance.createPlayer('Tester');
-    final s1 = vedicCatalog.first; // Ekadhikena: Compute N²
+    final player = await tester.runAsync(
+      () => DatabaseHelper.instance.createPlayer('Tester'),
+    );
+    final s1 = vedicCatalog.first;
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ExerciseScreen(item: s1, player: player),
+        home: ExerciseScreen(item: s1, player: player!),
       ),
     );
     await tester.pump();
@@ -83,7 +91,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('00:02'), findsOneWidget);
 
-    // Parse Q1 prompt and enter the exact correct answer
+    // Parse Q1 prompt and enter exact correct answer
     final promptFinder = find.textContaining('Compute ');
     final promptText = tester.widget<Text>(promptFinder).data!;
     final n = int.parse(
@@ -97,24 +105,21 @@ void main() {
     expect(find.text('Correct! +10 points!'), findsOneWidget);
     expect(find.text('10'), findsOneWidget);
 
-    // Advance to Q2, open Solution before answering -> forfeits points
+    // Advance to Q2 and open Solution sheet
     await tester.tap(find.text('Next Question'));
     await tester.pump();
     expect(find.text('Q 2 / 25'), findsOneWidget);
 
     await tester.tap(find.text('Solution'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('Vedic Solution'), findsOneWidget);
-
-    // Close bottom sheet
-    await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle();
   });
 
   testWidgets('PlayersScreen CRUD & Edit -> Cancel does not crash', (
     WidgetTester tester,
   ) async {
-    await DatabaseHelper.instance.createPlayer('Alice');
+    await tester.runAsync(() => DatabaseHelper.instance.createPlayer('Alice'));
     bool callbackFired = false;
 
     await tester.pumpWidget(
@@ -122,7 +127,7 @@ void main() {
         home: PlayersScreen(onPlayersChanged: () => callbackFired = true),
       ),
     );
-    await tester.pumpAndSettle();
+    await flushRealAsync(tester);
 
     expect(find.text('Alice'), findsOneWidget);
 
@@ -138,7 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'Bob');
     await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
+    await flushRealAsync(tester);
 
     expect(find.text('Bob'), findsOneWidget);
     expect(callbackFired, isTrue);
@@ -147,7 +152,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.delete_outline).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await flushRealAsync(tester);
 
     expect(find.text('Bob'), findsNothing);
   });
@@ -155,26 +160,29 @@ void main() {
   testWidgets('ProgressScreen renders LineChart with player scores', (
     WidgetTester tester,
   ) async {
-    final player = await DatabaseHelper.instance.createPlayer('ChartUser');
-    await DatabaseHelper.instance.saveSessionResult(
-      SessionRecord(
-        playerId: player.id!,
-        itemId: 's1',
-        itemTitle: 'Ekadhikena Purvena',
-        score: 200,
-        correctCount: 20,
-        totalQuestions: 25,
-        durationSeconds: 40,
-        completedAt: DateTime(2026, 11, 26),
-      ),
-    );
+    final player = await tester.runAsync(() async {
+      final p = await DatabaseHelper.instance.createPlayer('ChartUser');
+      await DatabaseHelper.instance.saveSessionResult(
+        SessionRecord(
+          playerId: p.id!,
+          itemId: 's1',
+          itemTitle: 'Ekadhikena Purvena',
+          score: 200,
+          correctCount: 20,
+          totalQuestions: 25,
+          durationSeconds: 40,
+          completedAt: DateTime(2026, 11, 26),
+        ),
+      );
+      return p;
+    });
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: ProgressScreen(player: player)),
+        home: Scaffold(body: ProgressScreen(player: player!)),
       ),
     );
-    await tester.pumpAndSettle();
+    await flushRealAsync(tester);
 
     expect(find.byType(LineChart), findsOneWidget);
     expect(find.text('200'), findsWidgets);
